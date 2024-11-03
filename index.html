@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Player Sci-Fi Memory Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #111;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .card {
+            aspect-ratio: 1;
+            position: relative;
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+
+        .card-inner {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: #fff;
+        }
+
+        .card-front {
+            background: linear-gradient(135deg, #0ff 30%, #00f);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+            transform: rotateY(180deg);
+        }
+
+        .card-back {
+            background-color: #333;
+            background: linear-gradient(135deg, #2a2a2a 30%, #1a1a1a);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card.matched.player1 .card-front {
+            background: linear-gradient(135deg, #ff3366 30%, #ff0044);
+            box-shadow: 0 0 20px rgba(255, 51, 102, 0.6);
+        }
+
+        .card.matched.player2 .card-front {
+            background: linear-gradient(135deg, #33ff99 30%, #00ff77);
+            box-shadow: 0 0 20px rgba(51, 255, 153, 0.6);
+        }
+
+        .status {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            color: #0ff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            margin-top: 20px;
+        }
+
+        .player-info {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .player {
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 20px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .player.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        #player1 {
+            border: 2px solid #ff3366;
+        }
+
+        #player2 {
+            border: 2px solid #33ff99;
+        }
+
+        .player.active#player1 {
+            background-color: rgba(255, 51, 102, 0.2);
+        }
+
+        .player.active#player2 {
+            background-color: rgba(51, 255, 153, 0.2);
+        }
+
+        @media (max-width: 600px) {
+            .game-container {
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .card-front, .card-back {
+                font-size: 1.5em;
+            }
+
+            .player {
+                padding: 10px 20px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="status">Level: <span id="level">1</span></div>
+    <div class="player-info">
+        <div id="player1" class="player active">
+            Player 1<br>Score: <span id="score1">0</span>
+        </div>
+        <div id="player2" class="player">
+            Player 2<br>Score: <span id="score2">0</span>
+        </div>
+    </div>
+    <div class="game-container" id="game-board"></div>
+
+    <script>
+        class MemoryGame {
+            constructor() {
+                this.gameBoard = document.getElementById('game-board');
+                this.levelDisplay = document.getElementById('level');
+                this.score1Display = document.getElementById('score1');
+                this.score2Display = document.getElementById('score2');
+                this.player1Element = document.getElementById('player1');
+                this.player2Element = document.getElementById('player2');
+                
+                this.flippedCards = [];
+                this.scores = { player1: 0, player2: 0 };
+                this.currentPlayer = 'player1';
+                this.level = 1;
+                this.isLocked = false;
+                this.cardSymbols = ["🚀", "🪐", "👽", "🌌", "☄️", "🛸", "💫", "🔭"];
+                this.setupGame();
+            }
+
+            setupGame() {
+                this.cards = [...this.cardSymbols, ...this.cardSymbols];
+                this.shuffleCards();
+                this.renderBoard();
+                this.updatePlayerDisplay();
+            }
+
+            shuffleCards() {
+                for (let i = this.cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+                }
+            }
+
+            renderBoard() {
+                this.gameBoard.innerHTML = '';
+                this.cards.forEach((symbol, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <div class="card-inner">
+                            <div class="card-back">?</div>
+                            <div class="card-front">${symbol}</div>
+                        </div>
+                    `;
+                    card.addEventListener('click', () => this.flipCard(card, symbol));
+                    this.gameBoard.appendChild(card);
+                });
+            }
+
+            updatePlayerDisplay() {
+                this.player1Element.classList.toggle('active', this.currentPlayer === 'player1');
+                this.player2Element.classList.toggle('active', this.currentPlayer === 'player2');
+            }
+
+            switchPlayer() {
+                this.currentPlayer = this.currentPlayer === 'player1' ? 'player2' : 'player1';
+                this.updatePlayerDisplay();
+            }
+
+            flipCard(card, symbol) {
+                if (
+                    this.isLocked || 
+                    this.flippedCards.length >= 2 || 
+                    card.classList.contains('flipped') ||
+                    card.classList.contains('matched')
+                ) {
+                    return;
+                }
+
+                card.classList.add('flipped');
+                this.flippedCards.push({ card, symbol });
+
+                if (this.flippedCards.length === 2) {
+                    this.isLocked = true;
+                    this.checkMatch();
+                }
+            }
+
+            checkMatch() {
+                const [first, second] = this.flippedCards;
+                const isMatch = first.symbol === second.symbol;
+
+                if (isMatch) {
+                    first.card.classList.add('matched', this.currentPlayer);
+                    second.card.classList.add('matched', this.currentPlayer);
+                    this.scores[this.currentPlayer]++;
+                    this.updateScores();
+
+                    const allMatched = document.querySelectorAll('.card.matched').length === this.cards.length;
+                    if (allMatched) {
+                        setTimeout(() => this.nextLevel(), 1000);
+                    }
+                } else {
+                    setTimeout(() => {
+                        first.card.classList.remove('flipped');
+                        second.card.classList.remove('flipped');
+                        this.switchPlayer();
+                    }, 1000);
+                }
+
+                setTimeout(() => {
+                    this.flippedCards = [];
+                    this.isLocked = false;
+                }, 1000);
+            }
+
+            updateScores() {
+                this.score1Display.textContent = this.scores.player1;
+                this.score2Display.textContent = this.scores.player2;
+            }
+
+            nextLevel() {
+                this.level++;
+                this.levelDisplay.textContent = this.level;
+                this.setupGame();
+            }
+        }
+
+        // Initialize Game
+        window.addEventListener('DOMContentLoaded', () => {
+            new MemoryGame();
+        });
+    </script>
+</body>
+</html>
